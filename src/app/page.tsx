@@ -19,7 +19,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 
 import { Input } from "@/components/ui/input";
@@ -41,23 +40,32 @@ const productSchema = z.object({
 export type Product = z.infer<typeof productSchema>;
 
 export default function Home() {
-  const [loading, isLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [products, setProducts] = useState<Product[]>(product);
-  const [openDialogDelete, setOpenDialogDelete] = useState(false);
-  const [form, setForm] = useState<Omit<Product, "id"> & { id: number | null }>(
-    {
-      id: null,
-      name: "",
-      price: "" as unknown as number,
-      stock: "" as unknown as number,
-    }
+  const [selectedProductId, setSelectedProductId] = useState<number | null>(
+    null
   );
+
+  // Form pakai string biar aman di input
+  const [form, setForm] = useState<{
+    id: number | null;
+    name: string;
+    price: string;
+    stock: string;
+  }>({
+    id: null,
+    name: "",
+    price: "",
+    stock: "",
+  });
+
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [search, setSearch] = useState<string>("");
   const [debouncedSearch, setDebouncedSearch] = useState<string>("");
   const [filter, setFilter] = useState<string>("");
 
-  useMemo(() => {
+  // ✅ pakai useEffect untuk debounce search
+  useEffect(() => {
     const handler = setTimeout(() => setDebouncedSearch(search), 500);
     return () => clearTimeout(handler);
   }, [search]);
@@ -91,38 +99,45 @@ export default function Home() {
         setProducts([...products, parsed]);
       }
 
-      setForm({
-        id: null,
-        name: "",
-        price: "" as unknown as number,
-        stock: "" as unknown as number,
-      });
-    } catch (err) {
-      if (err instanceof z.ZodError) {
-        alert(err.errors[0].message as string);
-      }
-    }
+      // reset form
+      setForm({ id: null, name: "", price: "", stock: "" });
+    } catch (err) {}
   };
+
+  // loading dummy
   useEffect(() => {
-    isLoading(true);
+    setLoading(true);
     setTimeout(() => {
-      isLoading(false);
+      setLoading(false);
     }, 1000);
   }, []);
+
   const handleEdit = (index: number) => {
-    setForm(products[index]);
+    const p = products[index];
+    setForm({
+      id: p.id ?? null,
+      name: p.name,
+      price: String(p.price),
+      stock: String(p.stock),
+    });
     setEditingIndex(index);
   };
+
   const deleteAll = () => {
     setProducts([]);
   };
 
-  const deleteProduct = (id: number) => {
-    const updatedList = products.filter((item) => item.id !== id);
-    setProducts(updatedList);
-    setOpenDialogDelete(false);
-    toast("Product has been deleted.");
+  const deleteProduct = () => {
+    if (selectedProductId !== null) {
+      const updatedList = products.filter(
+        (item) => item.id !== selectedProductId
+      );
+      setProducts(updatedList);
+      toast("Product has been deleted.");
+      setSelectedProductId(null);
+    }
   };
+
   const filteredProducts = useMemo(() => {
     let result = products;
 
@@ -155,9 +170,7 @@ export default function Home() {
               <Search size={18} className="  absolute left-2 top-2" />
               <Input
                 value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                }}
+                onChange={(e) => setSearch(e.target.value)}
                 type="text"
                 className="pl-8"
               />
@@ -183,38 +196,37 @@ export default function Home() {
             </Button>
           </div>
         </div>
-        <Card className="p-4">
-          {" "}
-          <h2 className="text-xl font-bold mb-4">Tambah / Edit Produk</h2>{" "}
+
+        {/* Form Tambah/Edit */}
+        <Card className="p-4 hidden md:flex">
+          <h2 className="text-xl font-bold mb-4">Tambah / Edit Produk</h2>
           <div className="grid grid-cols-3 gap-2 mb-2">
-            {" "}
             <Input
               placeholder="Nama"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-            />{" "}
+            />
             <Input
               placeholder="Harga"
               type="number"
-              value={form.price as unknown as string}
-              onChange={(e) =>
-                setForm({ ...form, price: e.target.value as unknown as number })
-              }
-            />{" "}
+              min={1}
+              value={form.price}
+              onChange={(e) => setForm({ ...form, price: e.target.value })}
+            />
             <Input
               placeholder="Stok"
               type="number"
-              value={form.stock as unknown as string}
-              onChange={(e) =>
-                setForm({ ...form, stock: e.target.value as unknown as number })
-              }
-            />{" "}
-          </div>{" "}
+              min={0}
+              value={form.stock}
+              onChange={(e) => setForm({ ...form, stock: e.target.value })}
+            />
+          </div>
           <Button onClick={handleAddOrUpdate}>
-            {" "}
-            {editingIndex !== null ? "Update Produk" : "Tambah Produk"}{" "}
-          </Button>{" "}
+            {editingIndex !== null ? "Update Produk" : "Tambah Produk"}
+          </Button>
         </Card>
+
+        {/* Product List */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {filteredProducts.length > 0 ? (
             loading ? (
@@ -224,15 +236,13 @@ export default function Home() {
             ) : (
               filteredProducts.map((product, index) => (
                 <div
-                  key={index}
+                  key={product.id ?? index}
                   className="max-w-sm bg-white border border-gray-200 rounded-lg shadow-sm dark:bg-gray-800 dark:border-gray-700"
                 >
                   <div className="p-5">
-                    <div>
-                      <h5 className="mb-2 text-lg font-bold tracking-tight text-gray-900 dark:text-white">
-                        {product.name}
-                      </h5>
-                    </div>
+                    <h5 className="mb-2 text-lg font-bold tracking-tight text-gray-900 dark:text-white">
+                      {product.name}
+                    </h5>
                     <p className="text-lg font-semibold">
                       <FormatRupiah value={product.price} />
                     </p>
@@ -247,21 +257,24 @@ export default function Home() {
                           <Pen size={20} />
                         </Button>
 
+                        {/* Dialog Delete */}
                         <Dialog
-                          open={openDialogDelete}
-                          onOpenChange={setOpenDialogDelete}
+                          open={selectedProductId === product.id}
+                          onOpenChange={(open) =>
+                            setSelectedProductId(
+                              open ? product.id ?? null : null
+                            )
+                          }
                         >
-                          <DialogTrigger>
-                            <Button
-                              onClick={() => {
-                                setOpenDialogDelete(true);
-                              }}
-                              variant={"ghost"}
-                              size={"icon"}
-                            >
-                              <Trash size={20} />
-                            </Button>
-                          </DialogTrigger>
+                          <Button
+                            onClick={() =>
+                              setSelectedProductId(product.id ?? null)
+                            }
+                            variant={"ghost"}
+                            size={"icon"}
+                          >
+                            <Trash size={20} />
+                          </Button>
                           <DialogContent>
                             <DialogHeader>
                               <DialogTitle>
@@ -269,24 +282,18 @@ export default function Home() {
                               </DialogTitle>
                               <DialogDescription>
                                 This action cannot be undone. This will
-                                permanently delete your account and remove your
-                                data from our servers.
+                                permanently delete this product.
                               </DialogDescription>
                             </DialogHeader>
                             <div className="flex justify-end gap-3">
-                              {" "}
                               <Button
-                                onClick={() => {
-                                  setOpenDialogDelete(false);
-                                }}
+                                onClick={() => setSelectedProductId(null)}
                                 variant={"outline"}
                               >
                                 Cancel
                               </Button>
                               <Button
-                                onClick={() =>
-                                  deleteProduct(product.id as number)
-                                }
+                                onClick={deleteProduct}
                                 variant={"destructive"}
                               >
                                 Delete

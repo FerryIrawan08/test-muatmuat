@@ -21,39 +21,60 @@ interface Props {
 interface PropsEffect {
   effect: string;
 }
+
+interface Pokemon {
+  is_hidden: boolean;
+  pokemon: {
+    name: string;
+    url: string;
+  };
+}
+
 export default function FetchApi() {
-  const [data, setData] = useState(null);
-  const [dataKeyEffect, setDataKeyEffect] = useState(null);
+  const [data, setData] = useState<{ game_indices: Props[] } | null>(null);
+  const [dataKeyEffect, setDataKeyEffect] = useState<{
+    effect_entries: PropsEffect[];
+    pokemon: Pokemon[];
+  } | null>(null);
+
   const [isLoading, setLoading] = useState(true);
   const [isLoadingKeyEffect, setLoadingKeyEffect] = useState(true);
 
+  // fetch pokemon data
   useEffect(() => {
     fetch("https://pokeapi.co/api/v2/pokemon/ditto")
       .then((res) => res.json())
       .then((data) => {
         setData(data);
         setLoading(false);
-      });
+      })
+      .catch(() => setLoading(false));
   }, []);
 
+  // fetch ability data
   useEffect(() => {
     fetch("https://pokeapi.co/api/v2/ability/battle-armor")
       .then((res) => res.json())
       .then((data) => {
         setDataKeyEffect(data);
         setLoadingKeyEffect(false);
-      });
+      })
+      .catch(() => setLoadingKeyEffect(false));
   }, []);
 
-  const filteredResponse: Props[] = data?.game_indices;
-  const filteredEffectResponse: PropsEffect[] = dataKeyEffect?.effect_entries;
+  const filteredResponse: Props[] = data?.game_indices ?? [];
+  const filteredEffectResponse: PropsEffect[] =
+    dataKeyEffect?.effect_entries ?? [];
+  const filteredPokemon: Pokemon[] = dataKeyEffect?.pokemon ?? [];
 
-  if (isLoading) return <p>Loading...</p>;
-  if (!data) return <p>No profile data</p>;
-  if (isLoadingKeyEffect) return <p>Loading...</p>;
-  if (!dataKeyEffect) return <p>No profile data</p>;
+  const filteredIsHidden = filteredPokemon.filter((num) => num.is_hidden);
+
+  if (isLoading || isLoadingKeyEffect) return <p>Loading...</p>;
+  if (!data || !dataKeyEffect) return <p>No profile data</p>;
+
   return (
-    <div className=" custom-container mt-12">
+    <div className="custom-container mt-12">
+      {/* Table Game Indices */}
       <Table>
         <TableHeader>
           <TableRow>
@@ -64,26 +85,51 @@ export default function FetchApi() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {filteredResponse.map((_, idx) => (
+          {filteredResponse.map((item, idx) => (
             <TableRow key={idx}>
               <TableCell className="font-medium">{idx + 1}</TableCell>
-              <TableCell>{_.game_index}</TableCell>
-              <TableCell>{_.version.name}</TableCell>
+              <TableCell>{item.game_index}</TableCell>
+              <TableCell>{item.version.name}</TableCell>
               <TableCell>
-                <a href={_.version.url} className=" underline text-blue-500">
-                  {_.version.url}
+                <a href={item.version.url} className="underline text-blue-500">
+                  {item.version.url}
                 </a>
               </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
+
+      {/* Effect Entries */}
       <div className="flex flex-col gap-2 mt-5">
-        {" "}
-        {filteredEffectResponse.map((_, idx) => (
-          <span key={idx}>{_.effect}</span>
+        {filteredEffectResponse.map((effect, idx) => (
+          <span key={idx}>{effect.effect}</span>
         ))}
       </div>
+
+      {/* Pokemon Hidden Ability */}
+      <Table className="mt-5">
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[100px]">No</TableHead>
+            <TableHead>Pokemon Name</TableHead>
+            <TableHead>URL</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {filteredIsHidden.map((poke, idx) => (
+            <TableRow key={idx}>
+              <TableCell className="font-medium">{idx + 1}</TableCell>
+              <TableCell>{poke.pokemon.name}</TableCell>
+              <TableCell>
+                <a href={poke.pokemon.url} className="underline text-blue-500">
+                  {poke.pokemon.url}
+                </a>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }
